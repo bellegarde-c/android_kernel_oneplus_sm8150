@@ -1044,10 +1044,12 @@ static void update_curr_rt(struct rq *rq)
 	u64 window_index = sample_window.window_index;
 	bool index = ODD(window_index);
 #endif
+	u64 now;
 
 	if (curr->sched_class != &rt_sched_class)
 		return;
 
+	now = rq_clock_task(rq);
 	delta_exec = rq_clock_task(rq) - curr->se.exec_start;
 	if (unlikely((s64)delta_exec <= 0))
 		return;

@@ -16,7 +16,6 @@
 #include <linux/jump_label_ratelimit.h>
 #include <linux/bug.h>
 #include <linux/cpu.h>
-#include <asm/sections.h>
 
 /* mutex to protect coming/going of the the jump_label table */
 static DEFINE_MUTEX(jump_label_mutex);
@@ -427,8 +426,7 @@ void __init jump_label_invalidate_init(void)
 	struct jump_entry *iter;
 
 	for (iter = iter_start; iter < iter_stop; iter++) {
-		if (iter->code >= (unsigned long)_sinittext &&
-		    iter->code < (unsigned long)_einittext)
+		if (init_kernel_text(iter->code))
 			iter->code = 0;
 	}
 }

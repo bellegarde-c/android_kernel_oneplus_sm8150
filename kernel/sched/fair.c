@@ -3648,6 +3648,7 @@ int update_rt_rq_load_avg(u64 now, int cpu, struct rt_rq *rt_rq, int running)
  */
 #define UPDATE_TG	0x1
 #define SKIP_AGE_LOAD	0x2
+#define SKIP_CPUFREQ	0x4
 
 /* Update task and its cfs_rq load average */
 static inline void update_load_avg(struct sched_entity *se, int flags)
@@ -3665,7 +3666,7 @@ static inline void update_load_avg(struct sched_entity *se, int flags)
 	if (se->avg.last_update_time && !(flags & SKIP_AGE_LOAD))
 		__update_load_avg_se(now, cpu, cfs_rq, se);
 
-	decayed  = update_cfs_rq_load_avg(now, cfs_rq, true);
+	decayed  = update_cfs_rq_load_avg(now, cfs_rq, !(flags & SKIP_CPUFREQ));
 	decayed |= propagate_entity_load_avg(se);
 
 	if (decayed && (flags & UPDATE_TG))
@@ -3966,6 +3967,7 @@ int update_rt_rq_load_avg(u64 now, int cpu, struct rt_rq *rt_rq, int running)
 
 #define UPDATE_TG	0x0
 #define SKIP_AGE_LOAD	0x0
+#define SKIP_CPUFREQ	0x0
 
 static inline void update_load_avg(struct sched_entity *se, int not_used1)
 {
@@ -4124,26 +4126,6 @@ enqueue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 	if (renorm && !curr)
 		se->vruntime += cfs_rq->min_vruntime;
 
-#ifdef CONFIG_UXCHAIN
-	if (entity_is_task(se) && sysctl_uxchain_enabled) {
-		struct task_struct *tsk = task_of(se);
-
-		if (is_opc_task(tsk, UT_FORE) && !tsk->dynamic_ux)
-			tsk->dynamic_ux = 1;
-
-		if (tsk->static_ux || tsk->dynamic_ux) {
-			u64 raw_vruntime;
-
-			raw_vruntime = se->vruntime;
-			se->vruntime = cfs_rq->min_vruntime -
-				(sysctl_sched_wakeup_granularity << 3);
-			if (raw_vruntime > se->vruntime)
-				se->vruntime_minus = raw_vruntime - se->vruntime;
-			boost_flag = 1;
-		}
-	}
-#endif
-
 	/*
 	 * When enqueuing a sched_entity, we must:
 	 *   - Update loads to have both entity and cfs_rq synced with now.
@@ -4157,13 +4139,8 @@ enqueue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 	update_cfs_shares(se);
 	account_entity_enqueue(cfs_rq, se);
 
-#ifdef CONFIG_UXCHAIN
-	if (flags & ENQUEUE_WAKEUP && !boost_flag)
-		place_entity(cfs_rq, se, 0);
-#else
 	if (flags & ENQUEUE_WAKEUP)
 		place_entity(cfs_rq, se, 0);
-#endif
 
 	check_schedstat_required();
 	update_stats_enqueue(cfs_rq, se, flags);
@@ -4228,6 +4205,7 @@ static __always_inline void return_cfs_rq_runtime(struct cfs_rq *cfs_rq);
 static void
 dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 {
+	int update_flags;
 	/*
 	 * Update run-time statistics of the 'current'.
 	 */
@@ -4241,7 +4219,12 @@ dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 	 *   - For group entity, update its weight to reflect the new share
 	 *     of its group cfs_rq.
 	 */
-	update_load_avg(se, UPDATE_TG);
+	update_flags = UPDATE_TG;
+
+	if (flags & DEQUEUE_IDLE)
+		update_flags |= SKIP_CPUFREQ;
+
+	update_load_avg(se, update_flags);
 	dequeue_entity_load_avg(cfs_rq, se);
 
 	update_stats_dequeue(cfs_rq, se, flags);
@@ -4252,20 +4235,6 @@ dequeue_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
 		__dequeue_entity(cfs_rq, se);
 	se->on_rq = 0;
 	account_entity_dequeue(cfs_rq, se);
-
-#ifdef CONFIG_UXCHAIN
-	if (entity_is_task(se) && sysctl_uxchain_enabled) {
-		struct task_struct *tsk = task_of(se);
-
-		if ((tsk->static_ux || tsk->dynamic_ux) &&
-			se->vruntime_minus > 0){
-			se->vruntime += se->vruntime_minus;
-			se->vruntime_minus = 0;
-		}
-		if (is_opc_task(tsk, UT_FORE) && tsk->dynamic_ux)
-			tsk->dynamic_ux = 0;
-	}
-#endif
 
 	/*
 	 * Normalize after update_curr(); which will also have moved
@@ -5403,8 +5372,6 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 	struct sched_entity *se = &p->se;
 	int task_new = !(flags & ENQUEUE_WAKEUP);
 
-	opc_task_switch(true, cpu_of(rq), p, 0);
-
 #ifdef CONFIG_SCHED_WALT
 	p->misfit = !task_fits_max(p, rq->cpu);
 #endif
@@ -5497,7 +5464,8 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 	struct sched_entity *se = &p->se;
 	int task_sleep = flags & DEQUEUE_SLEEP;
 
-	opc_task_switch(false, cpu_of(rq), p, rq->clock);
+	if (task_sleep && rq->nr_running == 1)
+		flags |= DEQUEUE_IDLE;
 
 	/*
 	 * The code below (indirectly) updates schedutil which looks at
@@ -5545,7 +5513,7 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 		if (cfs_rq_throttled(cfs_rq))
 			break;
 
-		update_load_avg(se, UPDATE_TG);
+		update_load_avg(se, UPDATE_TG | (flags & DEQUEUE_IDLE));
 		update_cfs_shares(se);
 	}
 
@@ -7522,38 +7490,6 @@ static int start_cpu(struct task_struct *p, bool boosted,
 {
 	struct root_domain *rd = cpu_rq(smp_processor_id())->rd;
 	int start_cpu = -1;
-	bool is_uxtop = is_opc_task(p, UT_FORE);
-
-#if defined(CONFIG_OPCHAIN) && defined(CONFIG_HOUSTON)
-	if (is_uxtop && current->ravg.demand_scaled >= p->ravg.demand_scaled) {
-		ht_rtg_list_add_tail(current);
-	}
-#endif
-
-	if (is_uxtop && task_sched_boost(p)) {
-		if (rd->mid_cap_orig_cpu != -1
-			&& task_fits_max(p, rd->mid_cap_orig_cpu))
-			return rd->mid_cap_orig_cpu;
-
-		return rd->max_cap_orig_cpu;
-	}
-
-#if defined(CONFIG_CONTROL_CENTER) && defined(CONFIG_IM)
-	if ((im_rendering(p)) &&
-			im_render_grouping_enable() &&
-			ccdm_get_hint(CCDM_TB_PLACE_BOOST) &&
-			task_util(p) > ccdm_get_min_util_threshold()) {
-		start_cpu = rd->mid_cap_orig_cpu == -1 ?
-			rd->max_cap_orig_cpu : rd->mid_cap_orig_cpu;
-		return start_cpu;
-	}
-#endif
-
-#ifdef CONFIG_ONEPLUS_FG_OPT
-	if (ht_fuse_boost && p->fuse_boost)
-		return rd->mid_cap_orig_cpu == -1 ?
-			rd->max_cap_orig_cpu : rd->mid_cap_orig_cpu;
-#endif
 
 	if (boosted) {
 		if (rd->mid_cap_orig_cpu != -1 &&
@@ -8423,7 +8359,7 @@ static int find_energy_efficient_cpu(struct sched_domain *sd,
 
 		if (task_placement_boost_enabled(p) || need_idle || boosted ||
 		    (rtg_target && (!cpumask_test_cpu(prev_cpu, rtg_target) ||
-		    cpumask_test_cpu(target_cpu, rtg_target))) || is_uxtop ||
+		    cpumask_test_cpu(target_cpu, rtg_target))) ||
 		    __cpu_overutilized(prev_cpu, delta) ||
 		    !task_fits_max(p, prev_cpu) || cpu_isolated(prev_cpu))
 			goto out;
@@ -8458,8 +8394,8 @@ out:
 
 	trace_sched_task_util(p, next_cpu, backup_cpu, target_cpu, sync,
 			need_idle, fbt_env.fastpath, placement_boost,
-			rtg_target ? cpumask_first(rtg_target) : -1, is_uxtop,
-			start_t, boosted);
+			rtg_target ? cpumask_first(rtg_target) : -1, start_t,
+            boosted);
 	return target_cpu;
 }
 
@@ -9394,8 +9330,6 @@ int can_migrate_task(struct task_struct *p, struct lb_env *env)
 		!task_fits_max(p, env->dst_cpu))
 		return 0;
 #endif
-	if (env->flags & LBF_IGNORE_UX_TOP && is_opc_task(p, UT_FORE))
-		return 0;
 	if (env->flags & LBF_IGNORE_SLAVE && UTASK_SLAVE(p))
 		return 0;
 

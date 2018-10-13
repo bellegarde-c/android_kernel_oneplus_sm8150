@@ -851,6 +851,7 @@ config FORCE_ALLOC_FROM_DMA_ZONE
 	  always using ZONE_DMA memory.
 
 	  If unsure, say "n".
+
 config DIRECT_SWAPPINESS
 	bool "direct swappiness"
 	default n
@@ -865,3 +866,7 @@ config ONEPLUS_MEM_MONITOR
 	default n
 	help
 	 memory monitor.
+
+config VMSTAT_INTERVAL
+	int "Default interval in seconds to update vmstat"
+	default 1

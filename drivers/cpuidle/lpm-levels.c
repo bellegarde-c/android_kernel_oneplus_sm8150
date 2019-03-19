@@ -1018,57 +1018,13 @@ static void clear_cl_predict_history(void)
 static int cluster_select(struct lpm_cluster *cluster, bool from_idle,
 							int *ispred)
 {
-	int best_level = -1;
 	int i;
-	struct cpumask mask;
-	uint32_t latency_us = ~0U;
-	uint32_t sleep_us;
-	uint32_t cpupred_us = 0, pred_us = 0;
-	int pred_mode = 0, predicted = 0;
 
 	if (!cluster)
 		return -EINVAL;
 
-	sleep_us = (uint32_t)get_cluster_sleep_time(cluster,
-						from_idle, &cpupred_us);
-
-	if (from_idle) {
-		pred_mode = cluster_predict(cluster, &pred_us);
-
-		if (cpupred_us && pred_mode && (cpupred_us < pred_us))
-			pred_us = cpupred_us;
-
-		if (pred_us && pred_mode && (pred_us < sleep_us))
-			predicted = 1;
-
-		if (predicted && (pred_us == cpupred_us))
-			predicted = 2;
-	}
-
-	if (cpumask_and(&mask, cpu_online_mask, &cluster->child_cpus))
-		latency_us = pm_qos_request_for_cpumask(PM_QOS_CPU_DMA_LATENCY,
-							&mask);
-
-	for (i = 0; i < cluster->nlevels; i++) {
+	for (i = cluster->nlevels - 1; i >= 0; i--) {
 		struct lpm_cluster_level *level = &cluster->levels[i];
-		struct power_params *pwr_params = &level->pwr;
-
-		if (!lpm_cluster_mode_allow(cluster, i, from_idle))
-			continue;
-
-		if (!cpumask_equal(&cluster->num_children_in_sync,
-					&level->num_cpu_votes))
-			continue;
-
-		if (from_idle && latency_us <= pwr_params->exit_latency)
-			break;
-
-		if (sleep_us < (pwr_params->exit_latency +
-						pwr_params->entry_latency))
-			break;
-
-		if (suspend_in_progress && from_idle && level->notify_rpm)
-			continue;
 
 		if (level->notify_rpm) {
 			if (!(sys_pm_ops && sys_pm_ops->sleep_allowed))
@@ -1077,23 +1033,10 @@ static int cluster_select(struct lpm_cluster *cluster, bool from_idle,
 				continue;
 		}
 
-		best_level = i;
-
-		if (from_idle &&
-			(predicted ? (pred_us <= pwr_params->max_residency)
-			: (sleep_us <= pwr_params->max_residency)))
-			break;
+		break;
 	}
 
-	if ((best_level == (cluster->nlevels - 1)) && (pred_mode == 2))
-		cluster->history.flag = 2;
-
-	*ispred = predicted;
-
-	trace_cluster_pred_select(cluster->cluster_name, best_level, sleep_us,
-						latency_us, predicted, pred_us);
-
-	return best_level;
+	return i;
 }
 
 static void cluster_notify(struct lpm_cluster *cluster,

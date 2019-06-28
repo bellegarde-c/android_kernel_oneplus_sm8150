@@ -120,6 +120,16 @@ static bool migrate_one_irq(struct irq_desc *desc)
 	if (cpumask_any_and(affinity, cpu_online_mask) >= nr_cpu_ids) {
 		const struct cpumask *default_affinity;
 
+		/*
+		 * If the interrupt is managed, then shut it down and leave
+		 * the affinity untouched.
+		 */
+		if (irqd_affinity_is_managed(d)) {
+			irqd_set_managed_shutdown(d);
+			irq_shutdown_and_deactivate(desc);
+			return false;
+		}
+
 		default_affinity = desc->affinity_hint ? : irq_default_affinity;
 		/*
 		 * The order of preference for selecting a fallback CPU is

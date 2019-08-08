@@ -2527,7 +2527,6 @@ blk_qc_t submit_bio(struct bio *bio)
 	}
 
 
-
 #ifdef CONFIG_MEMPLUS
         if (current_is_swapind())
                 bio->bi_opf |= REQ_FG;

@@ -972,6 +972,8 @@ struct device {
 #ifdef CONFIG_CONTROL_CENTER
 	bool cc_marked;
 #endif
+	struct list_head	iommu_map_list;
+	struct mutex		iommu_map_lock;
 };
 
 static inline struct device *kobj_to_dev(struct kobject *kobj)

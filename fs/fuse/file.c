@@ -942,7 +942,9 @@ static ssize_t fuse_file_read_iter(struct kiocb *iocb, struct iov_iter *to)
 			return err;
 	}
 
-	return generic_file_read_iter(iocb, to);
+    if (ff->passthrough.filp)
+        return fuse_passthrough_read_iter(iocb, to);
+    return generic_file_read_iter(iocb, to);
 }
 
 static void fuse_write_fill(struct fuse_req *req, struct fuse_file *ff,
@@ -1185,6 +1187,9 @@ static ssize_t fuse_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	struct inode *inode = mapping->host;
 	ssize_t err;
 	loff_t endbyte = 0;
+
+	if (ff->passthrough.filp)
+		return fuse_passthrough_write_iter(iocb, from);
 
 	if (get_fuse_conn(inode)->writeback_cache) {
 		/* Update size (EOF optimization) and mode (SUID clearing) */

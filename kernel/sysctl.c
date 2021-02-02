@@ -471,13 +471,6 @@ static struct ctl_table kern_table[] = {
 		.extra2		= &one_thousand,
 	},
 #endif
-	{
-		.procname	= "sched_upmigrate",
-		.data		= &sysctl_sched_capacity_margin_up,
-		.maxlen		= sizeof(unsigned int) * MAX_MARGIN_LEVELS,
-		.mode		= 0644,
-		.proc_handler	= sched_updown_migrate_handler,
-	},
 {
 		.procname	= "fg_io_opt",
 		.data		= &sysctl_fg_io_opt,
@@ -498,13 +491,6 @@ static struct ctl_table kern_table[] = {
 		.maxlen         = sizeof(unsigned long),
 		.mode           = 0644,
 		.proc_handler   = proc_dointvec,
-	},
-	{
-		.procname	= "sched_downmigrate",
-		.data		= &sysctl_sched_capacity_margin_down,
-		.maxlen		= sizeof(unsigned int) * MAX_MARGIN_LEVELS,
-		.mode		= 0644,
-		.proc_handler	= sched_updown_migrate_handler,
 	},
 	{
 		.procname       = "sched_energy_aware",

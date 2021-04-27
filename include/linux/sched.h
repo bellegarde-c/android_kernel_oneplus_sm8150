@@ -1458,6 +1458,7 @@ struct task_struct {
 	/* Used by LSM modules for access restriction: */
 	void				*security;
 #endif
+
 #ifdef CONFIG_OPCHAIN
 	u64 utask_tag;
 	u64 utask_tag_base;
@@ -1479,6 +1480,10 @@ struct task_struct {
 	unsigned in_futex:1;
 	unsigned in_binder:1;
 	unsigned in_epoll:1;
+#endif
+
+#ifdef CONFIG_ANDROID_SIMPLE_LMK
+	struct task_struct		*simple_lmk_next;
 #endif
 
 	/*

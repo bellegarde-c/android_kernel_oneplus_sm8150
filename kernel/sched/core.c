@@ -2884,6 +2884,7 @@ static struct rq *finish_task_switch(struct task_struct *prev)
 	 * to use.
 	 */
 	smp_mb__after_unlock_lock();
+	tick_nohz_task_switch();
 	finish_lock_switch(rq, prev);
 	finish_arch_post_lock_switch();
 	kcov_finish_switch(current);
@@ -2908,7 +2909,6 @@ static struct rq *finish_task_switch(struct task_struct *prev)
 
 	}
 
-	tick_nohz_task_switch();
 	return rq;
 }
 

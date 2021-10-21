@@ -2402,6 +2402,7 @@ out:
 EXPORT_SYMBOL(generic_make_request);
 
 
+#ifdef CONFIG_SMART_BOOST
 #define SYSTEM_APP_UID 1000
 static bool is_system_uid(struct task_struct *t)
 {
@@ -2476,6 +2477,7 @@ static bool high_prio_for_task(struct task_struct *t)
 
 	return false;
 }
+#endif
 
 
 /**

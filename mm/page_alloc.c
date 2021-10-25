@@ -2998,10 +2998,11 @@ struct page *rmqueue(struct zone *preferred_zone,
 	 * allocate greater than order-1 page units with __GFP_NOFAIL.
 	 */
 	WARN_ON_ONCE((gfp_flags & __GFP_NOFAIL) && (order > 1));
+#ifdef CONFIG_DEFRAG
 	page = defrag_alloc(zone, flags, migratetype, order);
 	if (page)
 		goto out;
-
+#endif
 	spin_lock_irqsave(&zone->lock, flags);
 
 	do {
@@ -3164,8 +3165,9 @@ bool __zone_watermark_ok(struct zone *z, unsigned int order, unsigned long mark,
 	if (!(alloc_flags & ALLOC_CMA))
 		free_pages -= zone_page_state(z, NR_FREE_CMA_PAGES);
 #endif
+#ifdef CONFIG_DEFRAG
 	free_pages -= defrag_calc(z, order, alloc_flags);
-
+#endif
 	/*
 	 * Check watermarks for an order-0 allocation request. If these
 	 * are not met, then a high-order request also cannot go ahead
@@ -3205,10 +3207,11 @@ bool __zone_watermark_ok(struct zone *z, unsigned int order, unsigned long mark,
 			return true;
 		}
 #endif
+#ifdef CONFIG_DEFRAG
 		if (defrag_check_alloc_flag(alloc_flags, order) &&
 				IS_NOT_DEFRAG_POOL_EMPTY(area))
 			return true;
-
+#endif
 		if (alloc_harder &&
 			!list_empty(&area->free_list[MIGRATE_HIGHATOMIC]))
 			return true;
@@ -3234,8 +3237,9 @@ static inline bool zone_watermark_fast(struct zone *z, unsigned int order,
 	if (!(alloc_flags & ALLOC_CMA))
 		cma_pages = zone_page_state(z, NR_FREE_CMA_PAGES);
 #endif
+#ifdef CONFIG_DEFRAG
 	cma_pages += defrag_zone_free_size(z);
-
+#endif
 	/*
 	 * Fast check for order-0 only. If this fails then the reserves
 	 * need to be calculated. There is a corner case where the check
@@ -3950,9 +3954,10 @@ gfp_to_alloc_flags(gfp_t gfp_mask)
 				(gfp_mask & __GFP_CMA))
 		alloc_flags |= ALLOC_CMA;
 #endif
+#ifdef CONFIG_DEFRAG
 	defrag_migrate_to_alloc_flag(alloc_flags,
 		gfpflags_to_migratetype(gfp_mask));
-
+#endif
 	return alloc_flags;
 }
 
@@ -4460,8 +4465,9 @@ static inline bool prepare_alloc_pages(gfp_t gfp_mask, unsigned int order,
 	if (IS_ENABLED(CONFIG_CMA) && ac->migratetype == MIGRATE_MOVABLE &&
 			(gfp_mask & __GFP_CMA))
 		*alloc_flags |= ALLOC_CMA;
+#ifdef CONFIG_DEFRAG
 	defrag_migrate_to_alloc_flag(*alloc_flags, ac->migratetype);
-
+#endif
 	return true;
 }
 
@@ -4509,14 +4515,18 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order, int preferred_nid,
 
 	finalise_ac(gfp_mask, order, &ac);
 
+#ifdef CONFIG_DEFRAG
 	ADD_ORDER_USAGE(order);
+#endif
 
 	/* First allocation attempt */
 	page = get_page_from_freelist(alloc_mask, order, alloc_flags, &ac);
 	if (likely(page))
 		goto out;
 
+#ifdef CONFIG_DEFRAG
 	ADD_ORDER_FAIL(order);
+#endif
 
 	/*
 	 * Apply scoped allocation constraints. This is mainly about GFP_NOFS

@@ -9,10 +9,6 @@
  * published by the Free Software Foundation.
  */
 
-#ifndef CONFIG_DEBUG_FS
-#define CONFIG_DEBUG_FS 1
-#endif
-
 struct clk_hw;
 struct clk_core;
 

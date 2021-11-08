@@ -148,6 +148,7 @@ static void _sde_core_perf_calc_crtc(struct sde_kms *kms,
 		perf->core_clk_rate = kms->perf.fix_core_clk_rate;
 	}
 
+	SDE_EVT32(crtc->base.id, perf->core_clk_rate);
 	SDE_DEBUG(
 		"crtc=%d clk_rate=%llu core_ib=%llu core_ab=%llu llcc_ib=%llu llcc_ab=%llu mem_ib=%llu mem_ab=%llu\n",
 			crtc->base.id, perf->core_clk_rate,

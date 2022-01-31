@@ -62,6 +62,7 @@
 #define NUM_OF_ENCRYPTED_KEY	3
 #define MINIDUMP_DEBUG_PROP "qcom,msm-imem-minidump-debug"
 
+#ifdef CONFIG_IPC_LOGGING
 #define pil_log(msg, desc)	\
 	do {			\
 		if (pil_ipc_log)		\
@@ -69,7 +70,9 @@
 		else		\
 			trace_pil_event(msg, desc);	\
 	} while (0)
-
+#else
+#define pil_log(msg, desc) {}
+#endif
 
 static void __iomem *pil_info_base;
 #ifdef CONFIG_QCOM_MINIDUMP
@@ -77,7 +80,9 @@ static void __iomem *minidump_debug;
 static struct md_global_toc *g_md_toc;
 #endif
 
+#ifdef CONFIG_IPC_LOGGING
 void *pil_ipc_log;
+#endif
 
 #ifdef CONFIG_QCOM_MINIDUMP
 static void __iomem *map_prop(const char *propname)
@@ -1755,10 +1760,11 @@ static int __init msm_pil_init(void)
 	pil_wq = alloc_workqueue("pil_workqueue", WQ_HIGHPRI | WQ_UNBOUND, 0);
 	if (!pil_wq)
 		pr_warn("pil: Defaulting to sequential firmware loading.\n");
-
+#ifdef CONFIG_IPC_LOGGING
 	pil_ipc_log = ipc_log_context_create(2, "PIL-IPC", 0);
 	if (!pil_ipc_log)
 		pr_debug("Failed to setup PIL ipc logging\n");
+#endif
 out:
 	return register_pm_notifier(&pil_pm_notifier);
 }

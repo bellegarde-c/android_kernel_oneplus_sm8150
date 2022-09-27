@@ -554,7 +554,6 @@ unsigned int cpufreq_driver_resolve_freq(struct cpufreq_policy *policy,
 
 		idx = cpufreq_frequency_table_target(policy, target_freq,
 		get_op_select_freq_enable() ? CPUFREQ_RELATION_OP : CPUFREQ_RELATION_L);
-		trace_cpu_frequency_select(target_freq, policy->freq_table[idx].frequency, idx, policy->cpu, 1);
 		policy->cached_resolved_idx = idx;
 		return policy->freq_table[idx].frequency;
 	}
@@ -1985,8 +1984,6 @@ unsigned int cpufreq_driver_fast_switch(struct cpufreq_policy *policy,
 				qos->max_cpufreq);
 
 	ret = cpufreq_driver->fast_switch(policy, target_freq);
-
-	trace_cpu_frequency_select(target_freq, ret, -2, policy->cpu, 2);
 
 	if (ret) {
 		cpufreq_times_record_transition(policy, ret);

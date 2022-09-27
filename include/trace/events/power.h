@@ -212,36 +212,6 @@ TRACE_EVENT(find_freq,
 		 __entry->op_enable, __entry->dp_level_mode, __entry->dp_level)
 );
 
-TRACE_EVENT(cpu_frequency_select,
-
-	TP_PROTO(unsigned int target_freq, unsigned int final_freq,
-		unsigned int index, int cpu, int num),
-
-	TP_ARGS(target_freq, final_freq, index, cpu, num),
-
-	TP_STRUCT__entry(
-		__field(u32, target_freq)
-		__field(u32, final_freq)
-		__field(u32, index)
-		__field(int, cpu)
-		__field(int, num)
-	),
-
-	TP_fast_assign(
-		__entry->target_freq = target_freq;
-		__entry->final_freq = final_freq;
-		__entry->index = index;
-		__entry->cpu = cpu;
-		__entry->num = num;
-	),
-
-	TP_printk("target=%lu final=%lu index=%lu cpu=%d num=%d",
-		  (unsigned long)__entry->target_freq,
-		  (unsigned long)__entry->final_freq,
-		  (unsigned long)__entry->index,
-				 __entry->cpu, __entry->num)
-);
-
 TRACE_EVENT(cpu_frequency_switch_start,
 
 	TP_PROTO(unsigned int start_freq, unsigned int end_freq,
